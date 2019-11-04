@@ -1,17 +1,22 @@
-DeepLung PyTorch1.0 Python3.7 with multi GPUs
-Illustration
+# DeepLung PyTorch1.0 Python3.7 with multi GPUs
+
+#Illustration
+
 The project is based on wentaozhu's work to upgrade and modify the version, and add some additional visualization functions.The original version is applicable to python 2.7 and pytorch 0.1 from https://github.com/wentaozhu/DeepLung, and the Paper link is https://arxiv.org/pdf/1801.09555.pdf(DeepLung: Deep 3D Dual Path Nets for Automated Pulmonary Nodule Detection and Classification." IEEE WACV, 2018.), and  https://arxiv.org/pdf/1805.05373.pdf(Deepem: Deep 3d convnets with em for weakly supervised pulmonary nodule detection, MICCAI, 2018.) Please cite this paper if you find this project helpful for your research.膜拜大佬!!!
 
-Dependencies
+# Dependencies
+
 python 3.7, CUDA 10.1,SimpleITK 1.2.2, numpy 1.17, matplotlib 3.1.1, scikit-image (0.21), scipy (0.3.1), pyparsing (2.4.2), pytorch (1.0) (anaconda is recommended) other packages could be the latest version.
 
-Instructions for runing
-Training:
-1.Install all dependencies
-2.Download dataset:
+# Instructions for runing
+
+# Training:
+
+# 1.Install all dependencies
+# 2.Download dataset:
 Download luna data from https://luna16.grand-challenge.org/download/, and Download LIDC-IDRI dataset from https://wiki.cancerimagingarchive.net/display/Public/LIDC-IDRI.
 
-3.Proprocess data:
+# 3.Proprocess data:
 
 For preprocessing, run ./DeepLung-Minerva/prepare.py. The parameters for prepare.py is in config_training.py.
 *_data_path is the unzip raw data path for LUNA16.
@@ -22,7 +27,7 @@ For preprocessing, run ./DeepLung-Minerva/prepare.py. The parameters for prepare
 
 3.1 The function of preprocess_luna in 662 line proproces luna data, and generate mask.npy clean.npy labe.npy spacing.npy,extendbox.npy,origin.npy to subset folder of config['preprocess_result_path'].
 
-5.Run detector：
+# 4.Run detector：
 
 cd ./detector 
 For Training
@@ -45,6 +50,8 @@ You can directly run noduleCADEvaluationLUNA16.py, and get the performance in th
 The trained model is in ./detector/dpnmodel/ or ./detector/resmodel/ The performances on each fold are (these results are in the supplement)
 
 <img src="./Visualize/Performance.png" width=50%>
+
+# 4.Run classifier：
 
 For nodule classification, first clean the data from LIDC-IDRI.
 Use the ./data/extclsshpinfo.py to extract nodule labels.
