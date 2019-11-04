@@ -7,7 +7,7 @@ class SplitComb():
         self.stride = stride
         self.margin = margin
         self.pad_value = pad_value
-        
+        # print(side_len,max_stride,stride,margin,pad_value)64 16 4 32 170
     def split(self, data, side_len = None, max_stride = None, margin = None):
         if side_len==None:
             side_len = self.side_len
@@ -18,24 +18,28 @@ class SplitComb():
         
         assert(side_len > margin)
         assert(side_len % max_stride == 0)
+        # print('margin, max_stride',margin, max_stride)
         assert(margin % max_stride == 0)
 
         splits = []
         _, z, h, w = data.shape
-
+        # print('READdata',data.shape)
         nz = int(np.ceil(float(z) / side_len))
         nh = int(np.ceil(float(h) / side_len))
         nw = int(np.ceil(float(w) / side_len))
         
         nzhw = [nz,nh,nw]
+        # print('nzhw',nzhw)
+        # print('nzhw',nz * side_len - z + margin)
         self.nzhw = nzhw
         
         pad = [ [0, 0],
-                [margin, nz * side_len - z + margin],
-                [margin, nh * side_len - h + margin],
-                [margin, nw * side_len - w + margin]]
+                [margin, nz * side_len - z + margin],#32,88
+                [margin, nh * side_len - h + margin],#32,
+                [margin, nw * side_len - w + margin]]#32,
         data = np.pad(data, pad, 'edge')
-
+        # print('PADdata',data.shape)
+        # print('PADdata',stop)
         for iz in range(nz):
             for ih in range(nh):
                 for iw in range(nw):
@@ -48,7 +52,8 @@ class SplitComb():
 
                     split = data[np.newaxis, :, sz:ez, sh:eh, sw:ew]
                     splits.append(split)
-
+        # splits.append(split)
+        
         splits = np.concatenate(splits, 0)
         return splits,nzhw
 
@@ -60,7 +65,7 @@ class SplitComb():
             stride = self.stride
         if margin == None:
             margin = self.margin
-        if nzhw==None:
+        if nzhw.any()==None:
             nz = self.nz
             nh = self.nh
             nw = self.nw
@@ -68,8 +73,10 @@ class SplitComb():
             nz,nh,nw = nzhw
         assert(side_len % stride == 0)
         assert(margin % stride == 0)
-        side_len /= stride
-        margin /= stride
+        # print('side_len, stride, margin',side_len, stride, margin)#160 4 16
+        # print('nz, nh, nw',nz, nh, nw)#2 2 2 
+        side_len //= stride#40
+        margin //= stride#8
 
         splits = []
         for i in range(len(output)):
@@ -81,7 +88,7 @@ class SplitComb():
             nw * side_len,
             splits[0].shape[3],
             splits[0].shape[4]), np.float32)
-
+        # print('ONES-output',output.shape, nzhw)
         idx = 0
         for iz in range(nz):
             for ih in range(nh):
