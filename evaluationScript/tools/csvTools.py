@@ -7,7 +7,8 @@ def writeCSV(filename, lines):
 
 def readCSV(filename):
     lines = []
-    with open(filename, "rb") as f:
+    # with open(filename, "rb") as f:
+    with open(filename, "rt") as f:
         csvreader = csv.reader(f)
         for line in csvreader:
             lines.append(line)
