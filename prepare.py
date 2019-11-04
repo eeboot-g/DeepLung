@@ -1,3 +1,4 @@
+#coding=utf-8
 import os
 import shutil
 import numpy as np
@@ -8,6 +9,7 @@ from config_training import config
 # config = config_training.config
 from scipy.io import loadmat
 import numpy as np
+import matplotlib.pyplot as plt
 import h5py
 import pandas
 import scipy
@@ -19,13 +21,24 @@ from skimage.morphology import convex_hull_image
 import pandas
 from multiprocessing import Pool
 from functools import partial
-
+import torch
 import warnings
-
+#######configuration of GPU 
+# import os
+# import tensorflow as tf
+# from keras.backend.tensorflow_backend import set_session
+# os.environ["CUDA_VISIBLE_DEVICES"]="3"
+# config_GPU = tf.ConfigProto()
+# config_GPU.gpu_options.per_process_gpu_memory_fraction = 0.5
+# config_GPU.gpu_options.allow_growth = True
+# set_session(tf.Session(config=config_GPU))
+##########
 def resample(imgs, spacing, new_spacing,order=2):
+    # print('imgs.shape',imgs.shape)
     if len(imgs.shape)==3:
         new_shape = np.round(imgs.shape * spacing / new_spacing)
         true_spacing = spacing * imgs.shape / new_shape
+        # print('000',true_spacing,spacing * imgs.shape,new_shape)#float
         resize_factor = new_shape / imgs.shape
         imgs = zoom(imgs, resize_factor, mode = 'nearest',order=order)
         return imgs, true_spacing
@@ -49,8 +62,15 @@ def worldToVoxelCoord(worldCoord, origin, spacing):
 def load_itk_image(filename):
     with open(filename) as f:
         contents = f.readlines()
-        line = [k for k in contents if k.startswith('TransformMatrix')][0]
+        # print('contents',filename)#/public/share/jiezhao/Minerva/Lung/data/luna16/subset_data/subset0/1.3.6.1.4.1.14519.5.2.1.6279.6001.1
+        # print('contents',contents)
+        '''contents ['ObjectType = Image\n', 'NDims = 3\n', 'BinaryData = True\n', 'BinaryDataByteOrderMSB = False\n', 'CompressedData = False\n', 'TransformMatrix = 1 0 0 0 1 0 0 0 1\n', 'Offset = -185 -205 -380.80999800000001\n', 'CenterOfRotation = 0 0 0\n', 'AnatomicalOrientation = RAI\n', 'ElementSpacing = 0.7226560115814209 0.7226560115814209 2.5\n', 'DimSize = 512 512 140\n', 'ElementType = MET_SHORT\n', 'ElementDataFile = 1.3.6.1.4.1.14519.5.2.1.6279.6001.139713436241461669335487719526.raw\n']'''
+
+        line = [k for k in contents if k.startswith('TransformMatrix')][0]#TransformMatrix = 1 0 0 0 1 0 0 0 1
+        
         transformM = np.array(line.split(' = ')[1].split(' ')).astype('float')
+        '''transformM [1. 0. 0. 0. 1. 0. 0. 0. 1.],图像矩阵是否翻转的标志.(在现实中CT扫描的时候有的人是正卧,有的人是仰卧的,所以会导致图像会出现翻转的情况.)'''
+        
         transformM = np.round(transformM)
         if np.any( transformM!=np.array([1,0,0, 0, 1, 0, 0, 0, 1])):
             isflip = True
@@ -61,8 +81,8 @@ def load_itk_image(filename):
     numpyImage = sitk.GetArrayFromImage(itkimage)
      
     numpyOrigin = np.array(list(reversed(itkimage.GetOrigin())))
-    numpySpacing = np.array(list(reversed(itkimage.GetSpacing())))
-     
+    numpySpacing = np.array(list(reversed(itkimage.GetSpacing())))#numpyOrigin [-298.774994 -143.100006 -180.600006] [0.625      0.74218798 0.74218798]Z-X-Y
+    
     return numpyImage, numpyOrigin, numpySpacing,isflip
 
 def process_mask(mask):
@@ -70,7 +90,7 @@ def process_mask(mask):
     for i_layer in range(convex_mask.shape[0]):
         mask1  = np.ascontiguousarray(mask[i_layer])
         if np.sum(mask1)>0:
-            mask2 = convex_hull_image(mask1)
+            mask2 = convex_hull_image(mask1)#将图片中的所有目标看作一个整体，因此计算出来只有一个最小凸多边形
             if np.sum(mask2)>1.5*np.sum(mask1):
                 mask2 = mask1
         else:
@@ -83,7 +103,9 @@ def process_mask(mask):
 
 def lumTrans(img):
     lungwin = np.array([-1200.,600.])
+    # print('np.max(img), np.min(img)',np.max(img), np.min(img))
     newimg = (img-lungwin[0])/(lungwin[1]-lungwin[0])
+    # print('np.max(newimg), np.min(newimg)',np.max(newimg), np.min(newimg))
     newimg[newimg<0]=0
     newimg[newimg>1]=1
     newimg = (newimg*255).astype('uint8')
@@ -94,6 +116,7 @@ def binarize_per_slice(image, spacing, intensity_th=-600, sigma=1, area_th=30, e
     
     # prepare a mask, with all corner values set to nan
     image_size = image.shape[1]
+    print('image_size',image_size)
     grid_axis = np.linspace(-image_size/2+0.5, image_size/2-0.5, image_size)
     x, y = np.meshgrid(grid_axis, grid_axis)
     d = (x**2+y**2)**0.5
@@ -300,12 +323,12 @@ def savenpy(id, annos, filelist, data_path, prep_folder):
         os.path.exists(os.path.join(prep_folder,name+'_origin.npy')) and \
         os.path.exists(os.path.join(prep_folder,name+'_label.npy')):
         if not isflip:
-            print 'skip', name
+            print('skip', name)
             return
         else:
             missingmask = True
 
-    print 'process', name
+    print('process', name)
     label = annos[annos[:,0]==name]
     # label = label.astype('float')
     label = label[:, [3,1,2,4]].astype('float') # z, y, x, d
@@ -316,7 +339,7 @@ def savenpy(id, annos, filelist, data_path, prep_folder):
     newshape = np.round(np.array(Mask.shape) * spacing / resolution)
     xx,yy,zz = np.where(Mask)
     if xx.size == 0 or yy.size == 0 or zz.size == 0:
-        print name 
+        print(name)
         assert 1 == 0
 
     box = np.array([[np.min(xx), np.max(xx)], [np.min(yy), np.max(yy)], [np.min(zz), np.max(zz)]])
@@ -326,7 +349,7 @@ def savenpy(id, annos, filelist, data_path, prep_folder):
     extendbox = np.vstack([np.max([[0,0,0],box[:,0]-margin],0),np.min([newshape,box[:,1]+2*margin],axis=0).T]).T
     extendbox = extendbox.astype('int')
     if extendbox[0,0] == extendbox[0,1] or extendbox[1,0] == extendbox[1,1] or extendbox[2,0] == extendbox[2,1]:
-        print name
+        print(name)
         assert 1==0
 
     convex_mask = m1
@@ -336,7 +359,7 @@ def savenpy(id, annos, filelist, data_path, prep_folder):
     Mask = m1+m2
     if missingmask:
         np.save(os.path.join(prep_folder,name+'_mask.npy'), Mask)
-        print 'skip', name
+        print('skip', name)
         return
     extramask = dilatedMask - Mask
     bone_thresh = 210
@@ -351,15 +374,16 @@ def savenpy(id, annos, filelist, data_path, prep_folder):
                 extendbox[1,0]:extendbox[1,1],
                 extendbox[2,0]:extendbox[2,1]]
     sliceim = sliceim2[np.newaxis,...]
-    np.save(os.path.join(prep_folder,name+'_clean.npy'), sliceim)
-    np.save(os.path.join(prep_folder,name+'_originbox.npy'), extendbox)
-    np.save(os.path.join(prep_folder,name+'_spacing.npy'), spacing)
-    np.save(os.path.join(prep_folder,name+'_origin.npy'), origin)
-    print im.shape, '_clean', sliceim.shape, '_originbox', extendbox.shape, '_space', spacing, '_origin', origin
+    print('-------------',sliceim.shape,extendbox.shape,spacing.shape,origin.shape)
+    # np.save(os.path.join(prep_folder,name+'_clean.npy'), sliceim)#经过
+    # np.save(os.path.join(prep_folder,name+'_originbox.npy'), extendbox)
+    # np.save(os.path.join(prep_folder,name+'_spacing.npy'), spacing)
+    # np.save(os.path.join(prep_folder,name+'_origin.npy'), origin)
+    print(im.shape, '_clean', sliceim.shape, '_originbox', extendbox.shape, '_space', spacing, '_origin', origin)
 
     this_annos = np.copy(annos[annos[:,0]==name])
     label = []
-    print 'label', this_annos.shape, name
+    print('label', this_annos.shape, name)
     if len(this_annos)>0:
         
         for c in this_annos:
@@ -377,8 +401,9 @@ def savenpy(id, annos, filelist, data_path, prep_folder):
         label2[3] = label2[3]*spacing[1]/resolution[1]
         label2[:3] = label2[:3]-np.expand_dims(extendbox[:,0],1)
         label2 = label2[:4].T
-    np.save(os.path.join(prep_folder,name+'_label.npy'),label2)
-    print name
+    print('-------------',label2.shape)
+    # np.save(os.path.join(prep_folder,name+'_label.npy'),label2)
+    print(name)
 
 def full_prep(train=True, val=True, test=True):
     warnings.filterwarnings("ignore")
@@ -441,21 +466,21 @@ def full_prep(train=True, val=True, test=True):
             partial_savenpy = partial(savenpy, annos=trainalllabel, filelist=trainfilelist, data_path=train_data_path, prep_folder=train_prep_folder)
             N = len(trainfilelist)
             savenpy(1)
-            _ = pool.map(partial_savenpy, range(N))
+            _=pool.map(partial_savenpy, range(N))
             print('end train preprocessing')
         if val:
             print('starting val preprocessing')
             partial_savenpy = partial(savenpy, annos=valalllabel, filelist=valfilelist, data_path=val_data_path, prep_folder=val_prep_folder)
             N = len(valfilelist)
             savenpy(1)
-            _ = pool.map(partial_savenpy, range(N))
+            _=pool.map(partial_savenpy, range(N))
             print('end val preprocessing')
         if test:
             print('starting test preprocessing')
             partial_savenpy = partial(savenpy, annos=testalllabel, filelist=testfilelist, data_path=test_data_path, prep_folder=test_prep_folder)
             N = len(testfilelist)
             savenpy(1)
-            _ = pool.map(partial_savenpy, range(N))
+            _=pool.map(partial_savenpy, range(N))
             pool.close()
             pool.join()
             print('end test preprocessing')
@@ -489,112 +514,148 @@ def splitvaltestcsv():
     valf.close()
 
 def savenpy_luna(id, annos, filelist, luna_segment, luna_data,savepath):
+    #annos=annos, filelist=filelist, luna_segment=luna_segment, luna_data=luna_data+'subset'+str(setidx)+'/', savepath=savepath+'subset'+str(setidx)+'/'
     islabel = True
     isClean = True
     resolution = np.array([1,1,1])
 #     resolution = np.array([2,2,2])
     name = filelist[id]
+    # print('name',id, name)#name 0 1.3.6.1.4.1.14519.5.2.1.6279.6001.303421828981831854739626597495
+    #name 1 1.3.6.1.4.1.14519.5.2.1.6279.6001.219087313261026510628926082729
     
     sliceim,origin,spacing,isflip = load_itk_image(os.path.join(luna_data,name+'.mhd'))
-
+    # plt.imshow(sliceim[100])
     Mask,origin,spacing,isflip = load_itk_image(os.path.join(luna_segment,name+'.mhd'))
     if isflip:
         Mask = Mask[:,::-1,::-1]
-    newshape = np.round(np.array(Mask.shape)*spacing/resolution).astype('int')
-    m1 = Mask==3
-    m2 = Mask==4
+    newshape = np.round(np.array(Mask.shape)*spacing/resolution).astype('int')#Uniform Thickness
+    m1 = Mask==3#左肺
+    m2 = Mask==4#右肺
     Mask = m1+m2
     
     xx,yy,zz= np.where(Mask)
-    box = np.array([[np.min(xx),np.max(xx)],[np.min(yy),np.max(yy)],[np.min(zz),np.max(zz)]])
+    box = np.array([[np.min(xx),np.max(xx)],[np.min(yy),np.max(yy)],[np.min(zz),np.max(zz)]])#[[ 38 640][ 88 425][ 16 495]]
+    
     box = box*np.expand_dims(spacing,1)/np.expand_dims(resolution,1)
-    box = np.floor(box).astype('int')
+    #[[ 19. 320.][ 53.453125 258.15429688][9.71875 300.67382812]]
+    box = np.floor(box).astype('int')#[[ 19 320][53 258][9 300]]
     margin = 5
-    extendbox = np.vstack([np.max([[0,0,0],box[:,0]-margin],0),np.min([newshape,box[:,1]+2*margin],axis=0).T]).T
-
-    this_annos = np.copy(annos[annos[:,0]==(name)])        
-
+    extendbox = np.vstack([np.max([[0,0,0],box[:,0]-margin],0),np.min([newshape,box[:,1]+2*margin],axis=0).T]).T#[[ 14 330][ 48 268][4 310]]
+    this_annos = np.copy(annos[annos[:,0]==(name)])#[['1.3.6.1.4.1.14519.5.2.1.6279.6001.317087518531899043292346860596' -87.92743528 -49.5343381 -117.00081509999998 9.443896197]]     
+    
     if isClean:
         convex_mask = m1
-        dm1 = process_mask(m1)
+        dm1 = process_mask(m1)#对掩码采取膨胀操作
         dm2 = process_mask(m2)
         dilatedMask = dm1+dm2
-        Mask = m1+m2
+        Mask = m1+m2#dilated
 
-        extramask = dilatedMask ^ Mask
+        extramask = dilatedMask ^ Mask#异或操作
         bone_thresh = 210
         pad_value = 170
 
         if isflip:
             sliceim = sliceim[:,::-1,::-1]
             print('flip!')
+        #预处理Three automated preprocessing steps are employed for the input CT images. First, we clip the raw data into [−1200, 600]. Second, we transform the range linearlyinto [0, 1]. Finally, we use LUNA16’s given segmentation ground truth and remove the background.
         sliceim = lumTrans(sliceim)
-        sliceim = sliceim*dilatedMask+pad_value*(1-dilatedMask).astype('uint8')
+        
+        sliceim = sliceim*dilatedMask+pad_value*(1-dilatedMask).astype('uint8')#膨胀肺区，其他地方=170
         bones = (sliceim*extramask)>bone_thresh
-        sliceim[bones] = pad_value
+        sliceim[bones] = pad_value#肺边缘大于bone_thresh=170
         
         sliceim1,_ = resample(sliceim,spacing,resolution,order=1)
         sliceim2 = sliceim1[extendbox[0,0]:extendbox[0,1],
                     extendbox[1,0]:extendbox[1,1],
-                    extendbox[2,0]:extendbox[2,1]]
-        sliceim = sliceim2[np.newaxis,...]
-        np.save(os.path.join(savepath, name+'_clean.npy'), sliceim)
-        np.save(os.path.join(savepath, name+'_spacing.npy'), spacing)
-        np.save(os.path.join(savepath, name+'_extendbox.npy'), extendbox)
-        np.save(os.path.join(savepath, name+'_origin.npy'), origin)
-        np.save(os.path.join(savepath, name+'_mask.npy'), Mask)
-
+                    extendbox[2,0]:extendbox[2,1]]#(290, 254, 334) 
+        # plt.imshow(sliceim2[100])
+        ###################################
+        # new_ct = sitk.GetImageFromArray(sliceim2)
+        # new_ct.SetDirection(ct.GetDirection())
+        # new_ct.SetOrigin(origin)
+        # new_ct.SetSpacing((1, 1, 1))
+        # new_ct_name = 'volume-' + str(random.randint) + '.nii'
+        # sitk.WriteImage(new_ct, os.path.join('./', new_ct_name))
+        ##########################################
+        sliceim = sliceim2[np.newaxis,...]#(1, 290, 254, 334)
+        # print('-------------1',sliceim)#(1, 262, 243, 346) (133, 512, 512) (3, 2) (3,) (3,)
+        # print('-------------1',sliceim.shape,Mask.shape,extendbox.shape,spacing.shape,origin.shape)#(1, 262, 243, 346) (133, 512, 512) (3, 2) (3,) (3,)
+        print('clean,spacing,extendbox,origin,mask,label to',savepath)#dtype=uint8)
+        np.save(os.path.join(savepath, name+'_clean.npy'), sliceim)#dtype=uint8)
+        np.save(os.path.join(savepath, name+'_spacing.npy'), spacing)#float
+        np.save(os.path.join(savepath, name+'_extendbox.npy'), extendbox)#int
+        np.save(os.path.join(savepath, name+'_origin.npy'), origin)#float
+        np.save(os.path.join(savepath, name+'_mask.npy'), Mask)#False True
+        # print(stop)
     if islabel:
         this_annos = np.copy(annos[annos[:,0]==(name)])
         label = []
         if len(this_annos)>0:
             
-            for c in this_annos:
+            for c in this_annos:#['1.3.6.1.4.1.14519.5.2.1.6279.6001.313334055029671473836954456733' 68.05574564 43.703103399999996 -266.0215516 12.68580657]
+                #[-77.98638617 32.80911691 88.23145221] to [222.786891864 270.481017322138 389.3338931958254]
                 pos = worldToVoxelCoord(c[1:4][::-1],origin=origin,spacing=spacing)
+                # print('c',c)
+                # print('pos',pos)
                 if isflip:
+                    print('isflip',pos[1:],Mask.shape[1:3],pos[1:])
                     pos[1:] = Mask.shape[1:3]-pos[1:]
+                
+                # print('this_annos',c[4])
+                # print('this_annos',spacing[1])
+                
                 label.append(np.concatenate([pos,[c[4]/spacing[1]]]))
-            
-        label = np.array(label)
+        
+        label = np.array(label)#some of [77.63902124 249.74407667712 208.87253984000003 6.534554632959999]
         if len(label)==0:
             label2 = np.array([[0,0,0,0]])
         else:
-            label2 = np.copy(label).T
+            #lable
+            '''[[68.33709408000001 285.52261784497364 426.1599867758768 24.773647110830687]
+               [56.542471040000024 337.2125031836933  408.310142823606277.913589855427735]]'''
+            label2 = np.copy(label).T#变成列向量
+            '''[[68.33709408000001 56.542471040000024]
+               [285.52261784497364 337.2125031836933]
+               [426.1599867758768 408.31014282360627]
+               [24.773647110830687 7.913589855427735]]'''
+
             label2[:3] = label2[:3]*np.expand_dims(spacing,1)/np.expand_dims(resolution,1)
             label2[3] = label2[3]*spacing[1]/resolution[1]
+            # print('0',label2[:3]*spacing[1], resolution[1])#float
             label2[:3] = label2[:3]-np.expand_dims(extendbox[:,0],1)
+            # print('1',label2[:3])
+            # print(stop)
             label2 = label2[:4].T
         np.save(os.path.join(savepath,name+'_label.npy'), label2)
+        # print('-------------2',label2)#float
         
     print(name)
 
 def preprocess_luna():
-    luna_segment = config['luna_segment']
-    savepath = config['preprocess_result_path']
-    luna_data = config['luna_data']
-    luna_label = config['luna_label']
-    finished_flag = '.flag_preprocessluna'
+    luna_segment = config['luna_segment']#'/public/share/jiezhao/Minerva/Lung/data/luna16/seg-lungs-LUNA16/'
+    savepath = config['preprocess_result_path']#'/public/share/jiezhao/Minerva/Lung/data/luna16/LUNA16PROPOCESSPATH/'
+    luna_data = config['luna_data']#'/public/share/jiezhao/Minerva/Lung/data/luna16/subset_data/'
+    luna_label = config['luna_label']#'/public/share/jiezhao/Minerva/Lung/data/luna16/CSVFILES/annotations.csv'
+    finished_flag = '.1flag_preprocessluna'
     print('starting preprocessing luna')
     if not os.path.exists(finished_flag):
         annos = np.array(pandas.read_csv(luna_label))
         pool = Pool()
         if not os.path.exists(savepath):
             os.mkdir(savepath)
-        for setidx in xrange(10):
-            print 'process subset', setidx
-            filelist = [f.split('.mhd')[0] for f in os.listdir(luna_data+'subset'+str(setidx)) if f.endswith('.mhd') ]
+        for setidx in range(10):
+            print('process subset', setidx)
+            filelist = [f.split('.mhd')[0] for f in os.listdir(luna_data+'subset'+str(setidx)) if f.endswith('.mhd') ]#1.3.6.1.4.1.14519.5.2.1.6279.6001.105756658031515062000744821260
             if not os.path.exists(savepath+'subset'+str(setidx)):
                 os.mkdir(savepath+'subset'+str(setidx))
-            partial_savenpy_luna = partial(savenpy_luna, annos=annos, filelist=filelist,
-                                       luna_segment=luna_segment, luna_data=luna_data+'subset'+str(setidx)+'/', 
-                                       savepath=savepath+'subset'+str(setidx)+'/')
+            partial_savenpy_luna = partial(savenpy_luna, annos=annos, filelist=filelist, luna_segment=luna_segment, luna_data=luna_data+'subset'+str(setidx)+'/', savepath=savepath+'subset'+str(setidx)+'/')
             N = len(filelist)
             #savenpy(1)
             _=pool.map(partial_savenpy_luna,range(N))
         pool.close()
         pool.join()
     print('end preprocessing luna')
-    f= open(finished_flag,"w+")
+    # f= open(finished_flag,"w+")
 
 
 if __name__=='__main__':
