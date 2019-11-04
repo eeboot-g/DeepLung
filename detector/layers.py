@@ -158,60 +158,69 @@ class Loss(nn.Module):
         self.sigmoid = nn.Sigmoid()
         self.classify_loss = nn.BCELoss()
         self.regress_loss = nn.SmoothL1Loss()
-        self.num_hard = num_hard
+        self.num_hard = num_hard#2
 
     def forward(self, output, labels, train = True):
         batch_size = labels.size(0)
-        output = output.view(-1, 5)
+        # print('loss',output.shape,labels.shape)#torch.Size([5, 24, 24, 24, 3, 5]) torch.Size([5, 24, 24, 24, 3, 5])
+        output = output.view(-1, 5)#将输出维度调整，以anchor为第二维度
         labels = labels.view(-1, 5)
+        # print('loss',output.shape,labels.shape)#torch.Size([207360, 5]) torch.Size([207360, 5])
         
-        pos_idcs = labels[:, 0] > 0.5
-        pos_idcs = pos_idcs.unsqueeze(1).expand(pos_idcs.size(0), 5)
-        pos_output = output[pos_idcs].view(-1, 5)
-        pos_labels = labels[pos_idcs].view(-1, 5)
+        pos_idcs = labels[:, 0] > 0.5#对标签进行筛选，输出为索引，示例[1,2,5],If an anchor overlaps a ground truth bounding box with the intersection over union (IoU) higher than 0.5, we consider it as a positive anchor
+        pos_idcs = pos_idcs.unsqueeze(1).expand(pos_idcs.size(0), 5)#对索引维度扩展，重复5次，示例[[1,1,1,1,1],[2,2,2,2,2],[5,5,5,5,5]]
+        pos_output = output[pos_idcs].view(-1, 5)#筛选出与正标签对应的输出
+        pos_labels = labels[pos_idcs].view(-1, 5)#筛选出正标签
 
-        neg_idcs = labels[:, 0] < -0.5
-        neg_output = output[:, 0][neg_idcs]
+        neg_idcs = labels[:, 0] < -0.5#同上，筛选负标签索引，此处为负值
+        neg_output = output[:, 0][neg_idcs]#注意，此处与上面不同，负标签只考虑置信度即可，因为位置及直径不计入损失，没有意义
         neg_labels = labels[:, 0][neg_idcs]
         
         if self.num_hard > 0 and train:
-            neg_output, neg_labels = hard_mining(neg_output, neg_labels, self.num_hard * batch_size)
-        neg_prob = self.sigmoid(neg_output)
+            neg_output, neg_labels = hard_mining(neg_output, neg_labels, self.num_hard * batch_size)#只选择置信度较高的负样本作计算，对于易于分类的负样本，都是虾兵蟹将，不足虑
+        neg_prob = self.sigmoid(neg_output)#对负样本输出进行sigmoid处理，生成0~1之间的值，符合置信度的范围，可能大家要问输出不就是0~1吗，这里网络最后没有用sigmoid激活函数，所以最后输出应该是没有范围的，
 
         #classify_loss = self.classify_loss(
          #   torch.cat((pos_prob, neg_prob), 0),
           #  torch.cat((pos_labels[:, 0], neg_labels + 1), 0))
         if len(pos_output)>0:
-            pos_prob = self.sigmoid(pos_output[:, 0])
-            pz, ph, pw, pd = pos_output[:, 1], pos_output[:, 2], pos_output[:, 3], pos_output[:, 4]
-            lz, lh, lw, ld = pos_labels[:, 1], pos_labels[:, 2], pos_labels[:, 3], pos_labels[:, 4]
-
-            regress_losses = [
+            pos_prob = self.sigmoid(pos_output[:, 0])#对正样本进行sigmoid处理
+            pz, ph, pw, pd = pos_output[:, 1], pos_output[:, 2], pos_output[:, 3], pos_output[:, 4]#依次输出z,h,w,d以便与标签结合求损失
+            lz, lh, lw, ld = pos_labels[:, 1], pos_labels[:, 2], pos_labels[:, 3], pos_labels[:, 4]#依次输出z,h,w,d以便与输出结合求损失
+            # print('0',pos_output.shape)
+            # print('0',pz, lz)
+            # print('0',ph, lh)
+            # print('0',pw, lw)
+            # print('0',pd, ld)
+            # print('0',stop)
+            regress_losses = [#回归损失
                 self.regress_loss(pz, lz),
                 self.regress_loss(ph, lh),
                 self.regress_loss(pw, lw),
                 self.regress_loss(pd, ld)]
-            regress_losses_data = [l.data[0] for l in regress_losses]
-            classify_loss = 0.5 * self.classify_loss(
+            # regress_losses_data = [l.data[0] for l in regress_losses]#torch0.3-0.1
+            regress_losses_data = [l.item() for l in regress_losses]#torch1.0
+            classify_loss = 0.5 * self.classify_loss(#对正样本和负样本分别求分类损失
             pos_prob, pos_labels[:, 0]) + 0.5 * self.classify_loss(
             neg_prob, neg_labels + 1)
-            pos_correct = (pos_prob.data >= 0.5).sum()
-            pos_total = len(pos_prob)
+            pos_correct = (pos_prob.data >= 0.5).sum()#那些输出确实大于0.5的正样本是正确预测的正样本
+            pos_total = len(pos_prob)#正样本总数
 
-        else:
+        else:#如果没有正标签，由于负标签又不用计算回归损失，于是回归损失就置零了，分类损失只计算负标签的分类损失
             regress_losses = [0,0,0,0]
             classify_loss =  0.5 * self.classify_loss(
             neg_prob, neg_labels + 1)
-            pos_correct = 0
-            pos_total = 0
+            pos_correct = 0 #此时没有正样本或正标签
+            pos_total = 0#总数也为0
             regress_losses_data = [0,0,0,0]
-        classify_loss_data = classify_loss.data[0]
+        # classify_loss_data = classify_loss.data[0]#torch0.1-0.3
+        classify_loss_data = classify_loss.item()#torch1.0
 
         loss = classify_loss
-        for regress_loss in regress_losses:
+        for regress_loss in regress_losses:#将回归损失与分类损失相加，求出总损失（标量）
             loss += regress_loss
 
-        neg_correct = (neg_prob.data < 0.5).sum()
+        neg_correct = (neg_prob.data < 0.5).sum()#那些输出确实低于0.5的负样本是正确预测的负样本
         neg_total = len(neg_prob)
 
         return [loss, classify_loss_data] + regress_losses_data + [pos_correct, pos_total, neg_correct, neg_total]
@@ -222,15 +231,17 @@ class GetPBB(object):
         self.anchors = np.asarray(config['anchors'])
 
     def __call__(self, output,thresh = -3, ismask=False):
-        stride = self.stride
-        anchors = self.anchors
+        stride = self.stride#4
+        anchors = self.anchors#5,10,20
         output = np.copy(output)
-        offset = (float(stride) - 1) / 2
+        # print(stride, (float(stride) - 1) / 2)#4,1.5
+        offset = (float(stride) - 1) / 2#1.5
         output_size = output.shape
         oz = np.arange(offset, offset + stride * (output_size[0] - 1) + 1, stride)
         oh = np.arange(offset, offset + stride * (output_size[1] - 1) + 1, stride)
         ow = np.arange(offset, offset + stride * (output_size[2] - 1) + 1, stride)
-        
+        # print('PBB-output',output.shape,oz.shape)
+        # print(oz.reshape((-1, 1, 1, 1)).shape, (output[:, :, :, :, 1] * anchors.reshape((1, 1, 1, -1))).shape)#(80, 1, 1, 1) (80, 80, 80, 3) (1, 1, 1, 3)
         output[:, :, :, :, 1] = oz.reshape((-1, 1, 1, 1)) + output[:, :, :, :, 1] * anchors.reshape((1, 1, 1, -1))
         output[:, :, :, :, 2] = oh.reshape((1, -1, 1, 1)) + output[:, :, :, :, 2] * anchors.reshape((1, 1, 1, -1))
         output[:, :, :, :, 3] = ow.reshape((1, 1, -1, 1)) + output[:, :, :, :, 3] * anchors.reshape((1, 1, 1, -1))
@@ -267,7 +278,7 @@ def nms(output, nms_th):
     return bboxes
 
 def iou(box0, box1):
-    
+    # print('box0//',box0)
     r0 = box0[3] / 2
     s0 = box0[:3] - r0
     e0 = box0[:3] + r0
