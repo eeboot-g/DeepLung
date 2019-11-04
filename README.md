@@ -74,3 +74,4 @@ Doctor's annotation for each nodule in LIDC-IDRI is in ./nodcls/annotationdetcls
 
 LIDC-IDRI nodule size report downloaded from http://www.via.cornell.edu/lidc/list3.2.csv is in /nodcls/data/list3.2.csv
 
+
