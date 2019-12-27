@@ -44,14 +44,14 @@ while line:
 fid.close()
 # read luna16 annotation
 colname = ['seriesuid', 'coordX', 'coordY', 'coordZ', 'diameter_mm']
-lunaantframe = pd.read_csv('annotations.csv', names=colname)
+lunaantframe = pd.read_csv('../annotations/annotations.csv', names=colname)
 srslist = lunaantframe.seriesuid.tolist()[1:]
 cdxlist = lunaantframe.coordX.tolist()[1:]
 cdylist = lunaantframe.coordY.tolist()[1:]
 cdzlist = lunaantframe.coordZ.tolist()[1:]
 dimlist = lunaantframe.diameter_mm.tolist()[1:]
 lunaantdict = {}
-for idx in xrange(len(srslist)):
+for idx in range(len(srslist)):
 	vlu = [float(cdxlist[idx]), float(cdylist[idx]), float(cdzlist[idx]), float(dimlist[idx])]
 	if srslist[idx] in lunaantdict:
 		lunaantdict[srslist[idx]].append(vlu)
@@ -90,9 +90,9 @@ for idx in xrange(len(srslist)):
 # 	p.close()
 # np.save('lunaantdictlidc.npy', lunantdictlidc)
 # read LIDC dataset
-lunantdictlidc = np.load('lunaantdictlidc.npy').item()
+lunantdictlidc = np.load('lunaantdictlidc.npy', allow_pickle= True).item()
 import xlrd
-lidccsvfname = '/media/data1/wentao/LIDC-IDRI/list3.2.xls'
+lidccsvfname = '../annotations/list3.2.xls'
 antdict = {}
 wb = xlrd.open_workbook(os.path.join(lidccsvfname))
 for s in wb.sheets():
@@ -117,30 +117,30 @@ for s in wb.sheets():
 			else:
 				antdict[s.cell(row, 0).value+'_'+str(int(s.cell(row, 1).value))].append(valuelist)
 # update LIDC annotation with series number, rather than scan id
-import dicom
-LIDCpath = '/media/data1/wentao/LIDC-IDRI/DOI/'
+import pydicom
+LIDCpath = '/home/zhaojie/zhaojie/Lung/data/LIDC-IDRI/'
 antdictscan = {}
-for k, v in antdict.iteritems():
+for k, v in antdict.items():
 	pid, scan = k.split('_')
 	hasscan = False
 	for sdu in os.listdir(os.path.join(LIDCpath, 'LIDC-IDRI-'+pid)):
 		for srs in os.listdir(os.path.join(*[LIDCpath, 'LIDC-IDRI-'+pid, sdu])):
 			if srs.endswith('.npy'):
-				print 'npy', pid, scan, srs
+				print('npy', pid, scan, srs)
 				continue
-			RefDs = dicom.read_file(os.path.join(*[LIDCpath, 'LIDC-IDRI-'+pid, sdu, srs, '000006.dcm']))
+			RefDs = pydicom.read_file(os.path.join(*[LIDCpath, 'LIDC-IDRI-'+pid, sdu, srs, '000006.dcm']))
 			# print scan, str(RefDs[0x20, 0x11].value)
 			if str(RefDs[0x20, 0x11].value) == scan or scan == '0': 
-				if hasscan: print 'rep', pid, sdu, srs
+				if hasscan: print('rep', pid, sdu, srs)
 				hasscan = True
 				antdictscan[pid+'_'+srs] = v
 				break
-	if not hasscan: print 'not found', pid, scan, sdu, srs
+	if not hasscan: print('not found', pid, scan, sdu, srs)
 # find the match from LIDC-IDRI annotation
 import math
 lunaantdictnodid = {}
 maxdist = 0
-for srcid, lunaantlidc in lunantdictlidc.iteritems():
+for srcid, lunaantlidc in lunantdictlidc.items():
 	lunaantdictnodid[srcid] = []
 	pid, stdid = sidmap[srcid]
 	# print pid
@@ -158,32 +158,32 @@ for srcid, lunaantlidc in lunantdictlidc.iteritems():
 			if dist < mindist:
 				mindist = dist
 				minidx = idx
-		if mindist > 71:#15.1:
-			print srcid, pid, voxcrd, antdictscan[pid+'_'+srcid], mindist
+		# if mindist > 71:#15.1:
+			# print('71',srcid, pid, voxcrd, antdictscan[pid+'_'+srcid], mindist)
 		maxdist = max(maxdist, mindist)
 		lunaantdictnodid[srcid].append([lunaant, antdictscan[pid+'_'+srcid][minidx][6:]])
 # np.save('lunaantdictnodid.npy', lunaantdictnodid)
-print 'maxdist', maxdist
+print('maxdist', maxdist)
 # save it into a csv
 # import csv
 # savename = 'annotationnodid.csv'
 # fid = open(savename, 'w')
 # writer = csv.writer(fid)
 # writer.writerow(['seriesuid', 'coordX', 'coordY', 'coordZ', 'diameter_mm'])
-# for srcid, ant in lunaantdictnodid.iteritems():
+# for srcid, ant in lunaantdictnodid.items():
 # 	for antsub in ant:
 # 		writer.writerow([srcid] + [antsub[0][0], antsub[0][1], antsub[0][2], antsub[0][3]] + antsub[1])
 # fid.close()
 # fd 1
 fd1lst = []
-for fname in os.listdir('/media/data1/wentao/tianchi/luna16/subset'+str(fold)+'/'):
+for fname in os.listdir('/home/zhaojie/zhaojie/Lung/data/luna16/subset_data/subset'+str(fold)+'/'):
 	if fname.endswith('.mhd'): fd1lst.append(fname[:-4])
 # find the malignancy, shape information from xml file
 import xml.dom.minidom
 ndoc = 0
 lunadctclssgmdict = {}
 mallstall, callstall, sphlstall, marlstall, loblstall, spilstall, texlstall = [], [], [], [], [], [], []
-for srsid, extant in lunaantdictnodid.iteritems():
+for srsid, extant in lunaantdictnodid.items():
 	if srsid not in fd1lst: continue
 	lunadctclssgmdict[srsid] = []
 	pid, stdid = sidmap[srsid]
@@ -191,10 +191,10 @@ for srsid, extant in lunaantdictnodid.iteritems():
 		getnodid = []
 		nant = 0
 		mallst = []
-		for fname in os.listdir(os.path.join(*['/media/data1/wentao/LIDC-IDRI/DOI/', pid, stdid, srsid])):
+		for fname in os.listdir(os.path.join(*['/home/zhaojie/zhaojie/Lung/data/LIDC-IDRI/', pid, stdid, srsid])):
 			if fname.endswith('.xml'):
 				nant += 1
-				dom = xml.dom.minidom.parse(os.path.join(*['/media/data1/wentao/LIDC-IDRI/DOI/', pid, stdid, srsid, fname]))
+				dom = xml.dom.minidom.parse(os.path.join(*['/home/zhaojie/zhaojie/Lung/data/LIDC-IDRI/', pid, stdid, srsid, fname]))
 				root = dom.documentElement
 				rsessions = root.getElementsByTagName('readingSession')
 				for rsess in rsessions:
@@ -202,7 +202,7 @@ for srsid, extant in lunaantdictnodid.iteritems():
 					for unb in unblinds:
 						nod = unb.getElementsByTagName('noduleID')
 						if len(nod) != 1: 
-							print 'more nod', nod
+							print('more nod', nod)
 							continue
 						if nod[0].firstChild.data in extantvlu[1]:
 							getnodid.append(nod[0].firstChild.data)
@@ -211,7 +211,7 @@ for srsid, extant in lunaantdictnodid.iteritems():
 								mallst.append(float(mal[0].firstChild.data))
 		# print(getnodid, extantvlu[1], nant)
 		if len(getnodid) > len(extantvlu[1]): 
-			print pid, srsid
+			print('pid, srsid',pid, srsid)
 			# assert 1 == 0
 		ndoc = max(ndoc, len(getnodid), len(extantvlu[1]))
 		vlulst = [srsid, extantvlu[0][0], extantvlu[0][1], extantvlu[0][2], extantvlu[0][3]]
@@ -246,7 +246,7 @@ ntest = 0
 for idx in xrange(len(newlst)):
 	fname = newlst[idx][0]
 	if fname.split('-')[0] in testfnamelst: ntest +=1
-print 'ntest', ntest, 'ntrain', len(newlst)-ntest
+print('ntest', ntest, 'ntrain', len(newlst)-ntest)
 prednamelst = {}
 predacc = 0
 predidx = 0
@@ -261,7 +261,7 @@ for idx in xrange(len(newlst)):
 		else:
 			prednamelst[fname.split('-')[0]].append([pixdimpred[predidx], fname.split('-')[1]])
 		predidx += 1
-print 'pred acc', predacc/float(predidx)
+print('pred acc', predacc/float(predidx))
 pixdimidx = -1
 # savename = 'annotationdetclssgm_doctor_fd2.csv'
 # fid = open(savename, 'w')
@@ -270,7 +270,7 @@ pixdimidx = -1
 doctornacc, doctornpid = [0]*ndoc, [0]*ndoc
 nacc = 0
 ntot = 0
-for srsid, extant in lunadctclssgmdict.iteritems():
+for srsid, extant in lunadctclssgmdict.items():
 	curidx = 0
 	if srsid not in fd1lst: continue
 	for subextant in extant:
