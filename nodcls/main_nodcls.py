@@ -93,7 +93,7 @@ dimlst = dataframe['diameter_mm'].tolist()[1:]
 # test id
 teidlst = []
 for foldnum in range(0,1):
-    for fname in os.listdir('/home/zhaojie/zhaojie/Lung/data/luna16/subset_data/subset'+str(foldnum)+'/'):
+    for fname in os.listdir('/root/autodl-tmp/LUNA16/subset_data/subset'+str(foldnum)+'/'):
         if fname.endswith('.mhd'):
             teidlst.append(fname[:-4])
 print('teidlst',len(teidlst))

@@ -22,7 +22,7 @@ for i in range(len(srslst)):
 fid.close()
 
 # train use gbt
-subset1path = '/home/zhaojie/zhaojie/Lung/data/luna16/subset_data/subset1/'
+subset1path = '/root/autodl-tmp/LUNA16/subset_data/subset1/'
 testfnamelst = []
 for fname in os.listdir(subset1path):
 	if fname.endswith('.mhd'):

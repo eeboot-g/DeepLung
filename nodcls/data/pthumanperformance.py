@@ -176,7 +176,7 @@ print('maxdist', maxdist)
 # fid.close()
 # fd 1
 fd1lst = []
-for fname in os.listdir('/home/zhaojie/zhaojie/Lung/data/luna16/subset_data/subset'+str(fold)+'/'):
+for fname in os.listdir('/root/autodl-tmp/LUNA16/subset_data/subset'+str(fold)+'/'):
 	if fname.endswith('.mhd'): fd1lst.append(fname[:-4])
 # find the malignancy, shape information from xml file
 import xml.dom.minidom
@@ -242,7 +242,7 @@ for i in range(len(srslst)):
 	# writer.writerow([srslst[i]+'-'+str(i), crdxlst[i], crdylst[i], crdzlst[i], dimlst[i], mlglst[i]])
 	newlst.append([srslst[i]+'-'+str(i), crdxlst[i], crdylst[i], crdzlst[i], dimlst[i], mlglst[i]])
 # fid.close()
-subset1path = '/home/zhaojie/zhaojie/Lung/data/luna16/subset_data/subset'+str(fold)+'/'
+subset1path = '/root/autodl-tmp/LUNA16/subset_data/subset'+str(fold)+'/'
 testfnamelst = []
 for fname in os.listdir(subset1path):
 	if fname.endswith('.mhd'):

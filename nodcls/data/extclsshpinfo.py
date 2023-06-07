@@ -67,7 +67,7 @@ for idx in range(len(srslist)):
 from multiprocessing import Pool
 lunantdictlidc = {}
 for fold in range(10):
-	mhdpath = '/home/zhaojie/zhaojie/Lung/data/luna16/subset_data/subset'+str(fold)
+	mhdpath = '/root/autodl-tmp/LUNA16/subset_data/subset'+str(fold)
 	print('fold', fold)
 	def getvoxcrd(fname):
 		sliceim,origin,spacing,isflip = load_itk_image(os.path.join(mhdpath, fname))

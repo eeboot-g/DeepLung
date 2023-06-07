@@ -16,7 +16,7 @@ annotations_excluded_filename = '/home/zhaojie/zhaojie/Lung/code/evaluationScrip
 seriesuids_filename = '/home/zhaojie/zhaojie/Lung/code/evaluationScript/10FoldCsvFiles/seriesuids' +str(fold) + '.csv'# path for seriesuid for the fold
 results_path = '/home/zhaojie/zhaojie/Lung/code/detector_py3/results/dpn3d26/retrft96' + str(trainnum) + '/val'#val' #val' ft96'+'/val'#
 sideinfopath = '/home/zhaojie/zhaojie/Lung/data/luna16/LUNA16PROPOCESSPATH/subset'+str(fold)+'/'
-datapath = '/home/zhaojie/zhaojie/Lung/data/luna16/subset_data/subset'+str(fold)+'/'
+datapath = '/root/autodl-tmp/LUNA16/subset_data/subset'+str(fold)+'/'
 maxeps = 995 #03 #150 #100#100
 
 # eps = range(1, maxeps+1, 1)#6,7,1)#5,151,5)#5,151,5)#76,77,1)#40,41,1)#76,77,1)#1,101,1)#17,18,1)#38,39,1)#1, maxeps+1, 1) #maxeps+1, 1)

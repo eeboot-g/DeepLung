@@ -56,7 +56,7 @@ for idx in range(len(newlst)):
 	# np.save(os.path.join(savepath, fname+'.npy'), cropdata)
 print(stop)
 # train use gbt
-subset1path = '/home/zhaojie/zhaojie/Lung/data/luna16/subset_data/subset1/'
+subset1path = '/root/autodl-tmp/LUNA16/subset_data/subset1/'
 testfnamelst = []
 for fname in os.listdir(subset1path):
 	if fname.endswith('.mhd'):

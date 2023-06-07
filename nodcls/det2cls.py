@@ -71,7 +71,7 @@ for idx in range(len(srslst)):
 # print('len(gtdct)',len(srsdct))#88=一个fold0的数量
 # pbb path, find the mapping of csv to pbb
 pbbpth = '/home/zhaojie/zhaojie/Lung/code/detector_py3/results/dpn3d26/'+'Test_Pbb/'
-# rawpth = '/home/zhaojie/zhaojie/Lung/data/luna16/subset_data/'
+# rawpth = '/root/autodl-tmp/LUNA16/subset_data/'
 # prppth = '/home/zhaojie/zhaojie/Lung/data/luna16/LUNA16PROPOCESSPATH/'
 trudat = {}
 tefnmlst = []
@@ -140,7 +140,7 @@ for idx in range(len(srslst)):
 # print('0',len(srsdct['1.3.6.1.4.1.14519.5.2.1.6279.6001.265960756233787099041040311282']))
 # pbb path, find the mapping of csv to pbb
 pbbpth = '/home/zhaojie/zhaojie/Lung/code/detector_py3/results/dpn3d26/Train_Pbb/'
-# rawpth = '/home/zhaojie/zhaojie/Lung/data/luna16/subset_data/'
+# rawpth = '/root/autodl-tmp/LUNA16/subset_data/'
 # prppth = '/home/zhaojie/zhaojie/Lung/data/luna16/LUNA16PROPOCESSPATH/'
 trudat = {}
 trfnmlst = []
